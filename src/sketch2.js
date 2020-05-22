@@ -5,14 +5,29 @@ let yOffset = 0;
 let pressed = false;
 let lockID = -1;
 let maxMove = 10;
+let hitWall = 0;
 
 function setup() {
   createCanvas(600,600);
-  blocks.push(new Block(50,50,50,75,0));
-  blocks.push(new Block(200,200,100,150,1));
-  blocks.push(new Block(400,450,150,100,2));
-  blocks.push(new Block(400,150,50,150,3));
+  let col = 3;
+  let row = 3;
+  let cnt = 0;
+  for(i = 0; i < col; i++){
+    for(j = 0; j < row; j++){
+        let x = i * (width / col);
+        let y = j * (height / row);
+        blocks.push(new Block(x,y,random(60,195),random(60,195), cnt));
+        cnt += 1;
+    };
+  };
+//   blocks.push(new Block(50,50,50,75,0));
+//   blocks.push(new Block(200,200,100,150,1));
+//   blocks.push(new Block(400,450,150,100,2));
+//   blocks.push(new Block(400,150,50,150,3));
+//   blocks.push(new Block(50,450,90,80,4));
+//   blocks.push(new Block(400,50,120,40,5));
   frameRate(30); 
+  noStroke();
 }
 
 function removeItemOnce(arr, value) { 
@@ -24,11 +39,10 @@ function removeItemOnce(arr, value) {
 }
 
 function draw() {
-  background(100);
+  background(10);
 
   let noBlockSelected = true;
   if(pressed){
-    let hitWall = false;
     blocks.forEach(function(block){
         block.plannedXY = [0,0];
     });
@@ -40,51 +54,27 @@ function draw() {
         let moveX = mouseX - (b1.xOffset) - b1.x;
         let moveY = mouseY - (b1.yOffset) - b1.y;
         let plan = [clip(moveX, -maxMove, maxMove), clip(moveY, -maxMove, maxMove)];
-        hitWall = b1.goPlan(plan);
-
+        hitWall = 0;
+        
         checkedIds = removeItemOnce(checkedIds, b1.id);
 
-        if(!hitWall){
-            checkedIds.forEach(function(id){
-                let b2 = blocks[id];
-                hit = collide(b2.x,b2.y,b2.w,b2.h,b1.x + plan[0], b1.y + plan[1],b1.w,b1.h);
-                if(hit){
-                    hitWall = b2.goPlan(plan);
-                    //checkedIds = removeItemOnce(checkedIds, b2.id);
-                    if(!hitWall){
-                        checkedIds.forEach(function(id){
-                            if(id != b2.id){
-                                let b3 = blocks[id];
-                                hit = collide(b3.x,b3.y,b3.w,b3.h,b2.x + plan[0],b2.y + plan[1],b2.w,b2.h);
-                                if(hit){
-                                    hitWall = b3.goPlan(plan);
-                                    //checkedIds = removeItemOnce(checkedIds, b3.id);
-                                    if(!hitWall){
-                                        checkedIds.forEach(function(id){
-                                            if(id != b3.id){
-                                                let b4 = blocks[id];
-                                                hit = collide(b4.x,b4.y,b4.w,b4.h,b3.x + plan[0],b3.y + plan[1],b3.w,b3.h);
-                                                if(hit){
-                                                    console.log(plan)
-                                                    hitWall = b4.goPlan(plan);
-                                                }
-                                            }
-                                        })
-                                    }
-                                }
-                            }
-                        })
-                    }
-                }
-            })
-        }
+        hitWall = hitWall + b1.goPlan(plan);
+        
+        let idNow = b1.id;
+        for (u = 0; u < blocks.length; u++){
+            if(hitWall == 0){
+                idNow = checkNext(idNow,checkedIds,plan);
+                if(!idNow){break}
+            } else {
+                break
+            }
+        };
         noBlockSelected = false;
         break;
       }
     }
-    console.log(hitWall);
     blocks.forEach(function(block){
-        if(hitWall){
+        if(hitWall > 0){
             block.goPlan([0,0]);
         }
         block.moveNow();
@@ -96,7 +86,37 @@ function draw() {
   }
   blocks.forEach(function(block) {
     block.display();
+    block.colorBack();;
   });
+}
+
+function checkNext(idNow, checkedIds, plan) {  
+    checkedIds.forEach(function(id){
+        if(id != idNow){
+            let b1 = blocks[idNow];
+            let b2 = blocks[id];
+            hit = collide(b2.x,b2.y,b2.w,b2.h,b1.x + plan[0], b1.y + plan[1],b1.w,b1.h);
+            if(hit){
+                hitWall = hitWall + b2.goPlan(plan);
+                b2.myColor = b1.myColor;
+                if(hitWall == 1){
+                    b2.hitColor();
+                    return false
+                };
+                checkNext(b2.id, checkedIds, plan);
+                return b2.id;
+            }
+        }
+    })
+    return false
+}
+
+function touchStarted() {
+    pressed = true;
+}
+
+function touchEnded() {
+    pressed = false;
 }
 
 function mousePressed() {
@@ -105,33 +125,6 @@ function mousePressed() {
 
 function mouseReleased(){
   pressed = false;
-}
-
-function checkCollision(b1,b2,checkedIds){
-  let hit = collide(b2.x,b2.y,b2.w,b2.h,b1.x,b1.y,b1.w,b1.h);
-  if(hit){
-    let colMove = collisionMove(b2.x,b2.y,b2.w,b2.h,b1.x,b1.y,b1.w,b1.h);
-    let hitWall;  
-    checkIds = removeItemOnce(checkedIds,b1.id);
-    checkIds = removeItemOnce(checkedIds,b2.id);
-    if(abs(colMove[0]) < abs(colMove[1])){
-      hitWall = b2.move(colMove[0], 0)
-    } else {
-      hitWall = b2.move(0, colMove[1])
-    }
-    if(!hitWall){
-      checkedIds.forEach(function(id){
-        let b3 = blocks[id];
-        // if(b3.id == b2.id){break}      
-          if(checkedIds.length != 0){
-            //removeItemOnce(b2.id);
-            hitWall = checkCollision(b2, b3, checkedIds);
-          }
-      })
-    }
-    return hitWall;
-  } else {
-      return false}
 }
 
 function clip (val, min, max) {
@@ -148,7 +141,6 @@ function collide (x, y, w, h, x2, y2, w2, h2) {
   return false;
 };
 
-
 class Block {
   constructor(x,y,w,h,id) {
     this.x = x;
@@ -160,6 +152,8 @@ class Block {
     this.id = id;
     this.lastXY = [0,0];
     this.plannedXY = [0,0];
+    this.myColor = [random(50,255),random(50,255),random(50,255),255];
+    this.color = this.myColor;
   }
 
   goPlan (plan){
@@ -172,24 +166,18 @@ class Block {
         (newY + this.h) > (height - maxMove) || 
         (newY) < maxMove
     ){
-        return true
+        return 1
     } else {
-        return false
+        return 0
     }
-    // return this.plannedXY
   }
 
-  go(newX, newY) {
-    this.lastXY = [this.x, this.y];
-    let moveX = clip(newX - (this.xOffset), 0, width - this.w) - this.x;
-    let moveY = clip(newY - (this.yOffset), 0, height - this.h) - this.y;
-    this.x = this.x + clip(moveX, -6, 6); // maximale geschwindigkeit 20
-    this.y = this.y + clip(moveY, -6, 6);
+  hitColor () {
+      this.color = [255,100,100,255];
   }
- 
-  toLast(){
-    this.x = this.lastXY[0];
-    this.y = this.lastXY[1];
+
+  colorBack () {
+     this.color = this.myColor;
   }
 
   moveNow() {
@@ -197,18 +185,6 @@ class Block {
     let moveY = this.y + this.plannedXY[1];
     this.x = moveX;//clip(moveX, 0, width - this.w);
     this.y = moveY;//clip(moveY, 0, height - this.h);
-  }
-
-  move(newX, newY) {
-    let moveX = this.x + newX;
-    let moveY = this.y + newY;
-    this.x = clip(moveX, 0, width - this.w);
-    this.y = clip(moveY, 0, height - this.h);
-    if(moveX != this.x || moveY != this.y){
-      return true;
-    } else {
-      return false;
-    }
   }
 
   over() {
@@ -237,6 +213,7 @@ class Block {
   }
 
   display() {
-    rect(this.x, this.y, this.w, this.h);
+        fill(this.color);
+        rect(this.x, this.y, this.w, this.h);
   }
 }
